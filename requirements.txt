@@ -1,0 +1,14 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pillow==11.1.0
+pymupdf==1.25.2
+pydantic==2.10.5
+einops
+addict
+easydict
+transformers==4.46.3
+tokenizers==0.20.3
+torch==2.6.0
+accelerate
+pyjwt==2.10.1

@@ -1,0 +1,37 @@
+services:
+  deepseek-ocr-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: deepseek-ocr-api:latest
+
+    container_name: deepseek-ocr-api
+
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+      - deepseek-temp:/tmp/deepseek_ocr
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  huggingface-cache:
+  deepseek-temp:
