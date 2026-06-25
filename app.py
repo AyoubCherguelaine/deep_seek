@@ -14,7 +14,7 @@ from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import jwt
 import torch
@@ -259,6 +259,39 @@ def _validate_positive_int(name: str, value: int) -> int:
     return value
 
 
+def _patch_generation_defaults(model: Any, tokenizer: Any) -> None:
+    if getattr(model, "_deepseek_ocr_api_generate_patched", False):
+        return
+
+    original_generate: Callable[..., Any] = model.generate
+
+    def generate_with_defaults(*args: Any, **kwargs: Any) -> Any:
+        input_ids = kwargs.get("input_ids")
+        if input_ids is None and args:
+            input_ids = args[0]
+
+        if "attention_mask" not in kwargs and input_ids is not None:
+            kwargs["attention_mask"] = torch.ones_like(input_ids, dtype=torch.long)
+
+        pad_token_id = getattr(tokenizer, "pad_token_id", None)
+        eos_token_id = kwargs.get("eos_token_id", getattr(tokenizer, "eos_token_id", None))
+
+        if kwargs.get("pad_token_id") is None and pad_token_id is not None:
+            kwargs["pad_token_id"] = pad_token_id
+
+        if kwargs.get("eos_token_id") is None and eos_token_id is not None:
+            kwargs["eos_token_id"] = eos_token_id
+
+        do_sample = kwargs.setdefault("do_sample", False)
+        if not do_sample and kwargs.get("temperature") == 0.0:
+            kwargs.pop("temperature")
+
+        return original_generate(*args, **kwargs)
+
+    model.generate = generate_with_defaults
+    model._deepseek_ocr_api_generate_patched = True
+
+
 def _clean_ocr_text(text: str) -> str:
     text = re.sub(r"<\|ref\|>.*?<\|/ref\|>", "", text, flags=re.DOTALL)
     text = re.sub(r"<\|det\|>.*?<\|/det\|>", "", text, flags=re.DOTALL)
@@ -462,6 +495,7 @@ def load_model() -> None:
         )
 
     model = model.eval()
+    _patch_generation_defaults(model, tokenizer)
 
     TOKENIZER = tokenizer
     MODEL = model
@@ -492,7 +526,12 @@ def run_deepseek_ocr(
     try:
         result = None
         captured_output = StringIO()
-        for attempt_crop_mode in (crop_mode, True):
+        crop_attempts = [crop_mode]
+        fallback_crop_mode = not crop_mode
+        if fallback_crop_mode not in crop_attempts:
+            crop_attempts.append(fallback_crop_mode)
+
+        for attempt_crop_mode in crop_attempts:
             try:
                 with torch.inference_mode():
                     with redirect_stdout(captured_output):
@@ -506,15 +545,18 @@ def run_deepseek_ocr(
                             crop_mode=attempt_crop_mode,
                             test_compress=test_compress,
                             save_results=settings.save_ocr_results,
+                            eval_mode=True,
                         )
                 break
             except UnboundLocalError as exc:
-                if "param_img" not in str(exc) or attempt_crop_mode:
+                if "param_img" not in str(exc) or attempt_crop_mode == crop_attempts[-1]:
                     raise
 
                 logger.warning(
-                    "DeepSeek-OCR failed with crop_mode=false (%s). Retrying with crop_mode=true.",
+                    "DeepSeek-OCR failed with crop_mode=%s (%s). Retrying with crop_mode=%s.",
+                    str(attempt_crop_mode).lower(),
                     exc,
+                    str(crop_attempts[-1]).lower(),
                 )
 
         text = ""
