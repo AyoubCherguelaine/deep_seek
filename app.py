@@ -437,6 +437,8 @@ def load_model() -> None:
         "trust_remote_code": True,
         "use_safetensors": True,
         "attn_implementation": attn_impl,
+        "torch_dtype": torch.bfloat16,
+        "device_map": {"": "cuda:0"},
     }
 
     try:
@@ -459,7 +461,7 @@ def load_model() -> None:
             **model_kwargs,
         )
 
-    model = model.eval().cuda().to(torch.bfloat16)
+    model = model.eval()
 
     TOKENIZER = tokenizer
     MODEL = model
