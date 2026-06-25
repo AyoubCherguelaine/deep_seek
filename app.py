@@ -165,12 +165,12 @@ def select_attention_backend() -> str:
     )
 
     if not settings.use_flash_attention:
-        logger.info("USE_FLASH_ATTENTION=false. Using sdpa attention backend.")
-        return "sdpa"
+        logger.info("USE_FLASH_ATTENTION=false. Using eager attention backend.")
+        return "eager"
 
     if cc < 8.0:
-        logger.info("Compute capability %.1f does not support flash_attention_2. Using sdpa.", cc)
-        return "sdpa"
+        logger.info("Compute capability %.1f does not support flash_attention_2. Using eager.", cc)
+        return "eager"
 
     if _flash_attention_importable():
         logger.info("flash-attn is importable. Using flash_attention_2.")
@@ -180,8 +180,8 @@ def select_attention_backend() -> str:
         logger.info("flash-attn installed and importable. Using flash_attention_2.")
         return "flash_attention_2"
 
-    logger.warning("FlashAttention requested but unavailable. Using sdpa attention backend.")
-    return "sdpa"
+    logger.warning("FlashAttention requested but unavailable. Using eager attention backend.")
+    return "eager"
 
 
 def is_pdf(filename: str, content_type: Optional[str]) -> bool:
@@ -231,6 +231,25 @@ def validate_image(path: Path) -> None:
 
 def _coalesce_optional_int(value: Optional[int], default: int) -> int:
     return default if value is None else value
+
+
+def _normalize_prompt(value: Optional[str]) -> str:
+    prompt = settings.default_prompt if value is None else value
+    prompt = prompt.replace("\\n", "\n").strip()
+
+    if not prompt or prompt.lower() in {"none", "null"}:
+        prompt = settings.default_prompt.replace("\\n", "\n").strip()
+
+    if not prompt:
+        raise HTTPException(status_code=400, detail="OCR prompt cannot be empty.")
+
+    return prompt + " "
+
+
+def _validate_positive_int(name: str, value: int) -> int:
+    if value <= 0:
+        raise HTTPException(status_code=400, detail=f"{name} must be greater than 0.")
+    return value
 
 
 # ---------------------------------------------------------
@@ -377,7 +396,7 @@ def load_model() -> None:
     model_kwargs = {
         "trust_remote_code": True,
         "use_safetensors": True,
-        "_attn_implementation": attn_impl,
+        "attn_implementation": attn_impl,
     }
 
     try:
@@ -394,7 +413,7 @@ def load_model() -> None:
             attn_impl,
             exc,
         )
-        model_kwargs["_attn_implementation"] = "eager"
+        model_kwargs["attn_implementation"] = "eager"
         model = AutoModel.from_pretrained(
             settings.model_name,
             **model_kwargs,
@@ -546,7 +565,7 @@ async def auth_token(
 @app.post("/ocr", response_model=OCRResponse)
 async def ocr(
     file: UploadFile = File(...),
-    prompt: Optional[str] = Form(None),
+    # prompt: Optional[str] = Form(None),
     base_size: Optional[int] = Form(None),
     image_size: Optional[int] = Form(None),
     crop_mode: Optional[bool] = Form(None),
@@ -576,9 +595,15 @@ async def ocr(
             detail="Unsupported file type. Upload an image or PDF.",
         )
 
-    used_prompt = settings.default_prompt if prompt is None else prompt
-    used_base_size = _coalesce_optional_int(base_size, settings.base_size)
-    used_image_size = _coalesce_optional_int(image_size, settings.image_size)
+    used_prompt = _normalize_prompt("<image>\n<|grounding|>Convert the document to markdown. ")
+    used_base_size = _validate_positive_int(
+        "base_size",
+        _coalesce_optional_int(base_size, settings.base_size),
+    )
+    used_image_size = _validate_positive_int(
+        "image_size",
+        _coalesce_optional_int(image_size, settings.image_size),
+    )
     used_crop_mode = settings.crop_mode if crop_mode is None else crop_mode
     used_test_compress = settings.test_compress if test_compress is None else test_compress
 

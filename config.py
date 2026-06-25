@@ -1,5 +1,27 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+
+def _load_env_file(path: str = ".env") -> None:
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+
+        if name:
+            os.environ.setdefault(name, value)
+
+
+_load_env_file()
 
 
 def _get_bool(name: str, default: bool) -> bool:

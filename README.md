@@ -31,7 +31,7 @@ cp .env.example .env
 
 - `AUTH_API_KEY` must be set for token auth
 - `MODEL_NAME` controls the Hugging Face model
-- `USE_FLASH_ATTENTION=true` tries `flash_attention_2` only when `flash-attn` is importable
+- `USE_FLASH_ATTENTION=true` tries `flash_attention_2` only when `flash-attn` is importable; otherwise the app uses eager attention
 - `ALLOW_FLASH_ATTENTION_INSTALL=true` allows runtime install of `flash-attn==2.7.3`
 - `BASE_SIZE`, `IMAGE_SIZE`, `CROP_MODE`, and `TEST_COMPRESS` tune OCR behavior
 
@@ -165,7 +165,7 @@ All configuration comes from environment variables.
 - `LOG_LEVEL` - log level, default `INFO`
 - `CUDA_VISIBLE_DEVICES` - GPU selection, default `0`
 - `MODEL_NAME` - Hugging Face model ID, default `deepseek-ai/DeepSeek-OCR-2`
-- `USE_FLASH_ATTENTION` - tries FlashAttention 2 when available, default `false`
+- `USE_FLASH_ATTENTION` - tries FlashAttention 2 when available; default `false` uses eager attention
 - `ALLOW_FLASH_ATTENTION_INSTALL` - permits runtime `flash-attn==2.7.3` install, default `false`
 - `BASE_SIZE` - OCR base size, default `1024`
 - `IMAGE_SIZE` - OCR image size, default `768`
