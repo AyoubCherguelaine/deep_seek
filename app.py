@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import traceback
+import types
 from contextlib import asynccontextmanager
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import jwt
 import torch
+import torch.nn.functional as F
 from fastapi import FastAPI, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -292,6 +294,55 @@ def _patch_generation_defaults(model: Any, tokenizer: Any) -> None:
     model._deepseek_ocr_api_generate_patched = True
 
 
+def _patch_dynamic_vision_queries(model: Any) -> None:
+    if getattr(model, "_deepseek_ocr_api_vision_queries_patched", False):
+        return
+
+    patched = False
+    for name, module in model.named_modules():
+        if module.__class__.__name__ != "Qwen2Decoder2Encoder":
+            continue
+
+        def fixed_forward(self: Any, x: torch.Tensor) -> torch.Tensor:
+            x = x.flatten(2).transpose(1, 2)
+            batch_size, n_query, _ = x.shape
+
+            if n_query == 144:
+                param_img = self.query_768.weight
+            elif n_query == 256:
+                param_img = self.query_1024.weight
+            else:
+                weight_ref = self.query_1024.weight.permute(1, 0).unsqueeze(0).to(x.dtype)
+                param_img = F.interpolate(
+                    weight_ref,
+                    size=n_query,
+                    mode="linear",
+                    align_corners=False,
+                )
+                param_img = param_img.squeeze(0).permute(1, 0)
+
+            batch_query_imgs = param_img.unsqueeze(0).expand(batch_size, -1, -1)
+            x_combined = torch.cat([x, batch_query_imgs], dim=1)
+            token_type_ids = torch.cat(
+                [
+                    torch.zeros(batch_size, n_query, dtype=torch.long, device=x.device),
+                    torch.ones(batch_size, n_query, dtype=torch.long, device=x.device),
+                ],
+                dim=1,
+            )
+            y = self.model(x_combined, token_type_ids)[0]
+            return y[:, n_query:, :]
+
+        module.forward = types.MethodType(fixed_forward, module)
+        logger.info("Patched DeepSeek-OCR dynamic vision queries on module: %s", name)
+        patched = True
+
+    if not patched:
+        logger.warning("DeepSeek-OCR dynamic vision query patch target was not found.")
+
+    model._deepseek_ocr_api_vision_queries_patched = True
+
+
 def _clean_ocr_text(text: str) -> str:
     text = re.sub(r"<\|ref\|>.*?<\|/ref\|>", "", text, flags=re.DOTALL)
     text = re.sub(r"<\|det\|>.*?<\|/det\|>", "", text, flags=re.DOTALL)
@@ -496,6 +547,7 @@ def load_model() -> None:
 
     model = model.eval()
     _patch_generation_defaults(model, tokenizer)
+    _patch_dynamic_vision_queries(model)
 
     TOKENIZER = tokenizer
     MODEL = model
