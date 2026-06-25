@@ -62,7 +62,7 @@ class Settings:
     # OCR mode. These defaults favor latency; raise them for higher quality.
     base_size: int = _get_int("BASE_SIZE", 640)
     image_size: int = _get_int("IMAGE_SIZE", 640)
-    crop_mode: bool = _get_bool("CROP_MODE", False)
+    crop_mode: bool = _get_bool("CROP_MODE", True)
     test_compress: bool = _get_bool("TEST_COMPRESS", False)
     pdf_zoom: float = _get_float("PDF_ZOOM", 1.5)
     save_ocr_results: bool = _get_bool("SAVE_OCR_RESULTS", False)

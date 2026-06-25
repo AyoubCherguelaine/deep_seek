@@ -488,19 +488,31 @@ def run_deepseek_ocr(
         raise RuntimeError("Model is not loaded.")
 
     try:
+        result = None
         captured_output = StringIO()
-        with torch.inference_mode():
-            with redirect_stdout(captured_output):
-                result = MODEL.infer(
-                    TOKENIZER,
-                    prompt=prompt,
-                    image_file=str(image_path),
-                    output_path=str(output_dir),
-                    base_size=base_size,
-                    image_size=image_size,
-                    crop_mode=crop_mode,
-                    test_compress=test_compress,
-                    save_results=settings.save_ocr_results,
+        for attempt_crop_mode in (crop_mode, True):
+            try:
+                with torch.inference_mode():
+                    with redirect_stdout(captured_output):
+                        result = MODEL.infer(
+                            TOKENIZER,
+                            prompt=prompt,
+                            image_file=str(image_path),
+                            output_path=str(output_dir),
+                            base_size=base_size,
+                            image_size=image_size,
+                            crop_mode=attempt_crop_mode,
+                            test_compress=test_compress,
+                            save_results=settings.save_ocr_results,
+                        )
+                break
+            except UnboundLocalError as exc:
+                if "param_img" not in str(exc) or attempt_crop_mode:
+                    raise
+
+                logger.warning(
+                    "DeepSeek-OCR failed with crop_mode=false (%s). Retrying with crop_mode=true.",
+                    exc,
                 )
 
         text = ""

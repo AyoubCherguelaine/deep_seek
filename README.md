@@ -165,7 +165,7 @@ All configuration comes from environment variables.
 - `ALLOW_FLASH_ATTENTION_INSTALL` - permits runtime `flash-attn==2.7.3` install, default `false`
 - `BASE_SIZE` - OCR base size, default `640`
 - `IMAGE_SIZE` - OCR image size, default `640`
-- `CROP_MODE` - crop mode toggle, default `false`
+- `CROP_MODE` - crop mode toggle, default `true`
 - `TEST_COMPRESS` - compression test toggle, default `false`
 - `PDF_ZOOM` - PDF render scale, default `1.5`; use `2.0` for higher quality
 - `SAVE_OCR_RESULTS` - writes model output files before reading them, default `false`
@@ -180,7 +180,7 @@ All configuration comes from environment variables.
 ## Notes
 
 - The app defaults to eager attention for DeepSeek-OCR-2.
-- For higher quality but slower OCR, use `BASE_SIZE=1024`, `IMAGE_SIZE=768`, `CROP_MODE=true`, and `PDF_ZOOM=2.0`.
+- For higher quality but slower OCR, use `BASE_SIZE=1024`, `IMAGE_SIZE=768`, and `PDF_ZOOM=2.0`.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.
 - PDFs require `pymupdf`, which is already listed in `requirements.txt`.
 - A single GPU request is processed at a time to reduce CUDA out-of-memory issues.
