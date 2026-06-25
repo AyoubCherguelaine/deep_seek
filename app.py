@@ -223,14 +223,18 @@ def validate_image(path: Path) -> None:
     try:
         with Image.open(path) as img:
             img.verify()
+        with Image.open(path) as img:
+            width, height = img.size
     except UnidentifiedImageError:
         raise HTTPException(status_code=400, detail="Invalid image file.")
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Image validation failed: {exc}")
 
-
-def _coalesce_optional_int(value: Optional[int], default: int) -> int:
-    return default if value is None else value
+    if width < 16 or height < 16:
+        raise HTTPException(
+            status_code=400,
+            detail="Image is too small for OCR. Minimum size is 16x16 pixels.",
+        )
 
 
 def _normalize_prompt(value: Optional[str]) -> str:
@@ -565,11 +569,6 @@ async def auth_token(
 @app.post("/ocr", response_model=OCRResponse)
 async def ocr(
     file: UploadFile = File(...),
-    # prompt: Optional[str] = Form(None),
-    base_size: Optional[int] = Form(None),
-    image_size: Optional[int] = Form(None),
-    crop_mode: Optional[bool] = Form(None),
-    test_compress: Optional[bool] = Form(None),
     _claims: Dict[str, Any] = Depends(require_bearer),
 ) -> OCRResponse:
     """
@@ -595,17 +594,17 @@ async def ocr(
             detail="Unsupported file type. Upload an image or PDF.",
         )
 
-    used_prompt = _normalize_prompt("<image>\n<|grounding|>Convert the document to markdown. ")
+    used_prompt = _normalize_prompt(None)
     used_base_size = _validate_positive_int(
         "base_size",
-        _coalesce_optional_int(base_size, settings.base_size),
+        settings.base_size,
     )
     used_image_size = _validate_positive_int(
         "image_size",
-        _coalesce_optional_int(image_size, settings.image_size),
+        settings.image_size,
     )
-    used_crop_mode = settings.crop_mode if crop_mode is None else crop_mode
-    used_test_compress = settings.test_compress if test_compress is None else test_compress
+    used_crop_mode = settings.crop_mode
+    used_test_compress = settings.test_compress
 
     request_dir = Path(tempfile.mkdtemp(prefix="ocr_", dir=settings.temp_dir))
     input_path = request_dir / file.filename

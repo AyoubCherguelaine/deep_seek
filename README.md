@@ -6,9 +6,8 @@ FastAPI service for running DeepSeek-OCR on an NVIDIA GPU. The app accepts image
 
 - OCR for PNG, JPG, JPEG, WEBP, BMP, TIFF, and PDF
 - Optional bearer-token auth
-- RTX 50 / Blackwell Docker build using CUDA 12.8 PyTorch wheels
-- PyTorch SDPA attention by default, with optional FlashAttention 2 fallback
-- Docker and docker-compose deployment
+- Eager attention by default for DeepSeek-OCR-2
+- Local uvicorn runtime
 - Health endpoint for readiness checks
 
 ## Requirements
@@ -135,11 +134,8 @@ Uploads one image or PDF for OCR.
 Form fields:
 
 - `file` - required upload
-- `prompt` - optional prompt override
-- `base_size` - optional override for the model
-- `image_size` - optional override for the model
-- `crop_mode` - optional boolean override
-- `test_compress` - optional boolean override
+
+OCR settings are read from `.env`; this endpoint does not accept per-request model options.
 
 Supported inputs:
 
@@ -181,7 +177,7 @@ All configuration comes from environment variables.
 
 ## Notes
 
-- The app defaults to PyTorch SDPA attention, then retries model loading with eager attention if needed.
+- The app defaults to eager attention for DeepSeek-OCR-2.
 - If you hit CUDA OOM, use `BASE_SIZE=640`, `IMAGE_SIZE=640`, and `CROP_MODE=false`.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.
 - PDFs require `pymupdf`, which is already listed in `requirements.txt`.
