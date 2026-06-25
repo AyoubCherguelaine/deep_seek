@@ -32,7 +32,7 @@ cp .env.example .env
 - `MODEL_NAME` controls the Hugging Face model
 - `USE_FLASH_ATTENTION=true` tries `flash_attention_2` only when `flash-attn` is importable; otherwise the app uses eager attention
 - `ALLOW_FLASH_ATTENTION_INSTALL=true` allows runtime install of `flash-attn==2.7.3`
-- `BASE_SIZE`, `IMAGE_SIZE`, `CROP_MODE`, and `TEST_COMPRESS` tune OCR behavior
+- `BASE_SIZE`, `IMAGE_SIZE`, `CROP_MODE`, `PDF_ZOOM`, and `TEST_COMPRESS` tune OCR speed/quality
 
 3. Start the app:
 
@@ -163,10 +163,12 @@ All configuration comes from environment variables.
 - `MODEL_NAME` - Hugging Face model ID, default `deepseek-ai/DeepSeek-OCR-2`
 - `USE_FLASH_ATTENTION` - tries FlashAttention 2 when available; default `false` uses eager attention
 - `ALLOW_FLASH_ATTENTION_INSTALL` - permits runtime `flash-attn==2.7.3` install, default `false`
-- `BASE_SIZE` - OCR base size, default `1024`
-- `IMAGE_SIZE` - OCR image size, default `768`
-- `CROP_MODE` - crop mode toggle, default `true`
+- `BASE_SIZE` - OCR base size, default `640`
+- `IMAGE_SIZE` - OCR image size, default `640`
+- `CROP_MODE` - crop mode toggle, default `false`
 - `TEST_COMPRESS` - compression test toggle, default `false`
+- `PDF_ZOOM` - PDF render scale, default `1.5`; use `2.0` for higher quality
+- `SAVE_OCR_RESULTS` - writes model output files before reading them, default `false`
 - `DEFAULT_PROMPT` - default OCR prompt
 - `MAX_UPLOAD_MB` - upload limit in MB, default `40`
 - `MAX_PDF_PAGES` - max PDF pages, default `10`
@@ -178,7 +180,7 @@ All configuration comes from environment variables.
 ## Notes
 
 - The app defaults to eager attention for DeepSeek-OCR-2.
-- If you hit CUDA OOM, use `BASE_SIZE=640`, `IMAGE_SIZE=640`, and `CROP_MODE=false`.
+- For higher quality but slower OCR, use `BASE_SIZE=1024`, `IMAGE_SIZE=768`, `CROP_MODE=true`, and `PDF_ZOOM=2.0`.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.
 - PDFs require `pymupdf`, which is already listed in `requirements.txt`.
 - A single GPU request is processed at a time to reduce CUDA out-of-memory issues.

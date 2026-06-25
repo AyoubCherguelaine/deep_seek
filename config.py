@@ -38,6 +38,13 @@ def _get_int(name: str, default: int) -> int:
     return int(value)
 
 
+def _get_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return float(value)
+
+
 @dataclass(frozen=True)
 class Settings:
     # Server
@@ -52,12 +59,13 @@ class Settings:
     use_flash_attention: bool = _get_bool("USE_FLASH_ATTENTION", False)
     allow_flash_attention_install: bool = _get_bool("ALLOW_FLASH_ATTENTION_INSTALL", False)
 
-    # OCR mode
-    # Mirrors the working notebook's OCR-2 crop-mode defaults for RTX 50.
-    base_size: int = _get_int("BASE_SIZE", 1024)
-    image_size: int = _get_int("IMAGE_SIZE", 768)
-    crop_mode: bool = _get_bool("CROP_MODE", True)
+    # OCR mode. These defaults favor latency; raise them for higher quality.
+    base_size: int = _get_int("BASE_SIZE", 640)
+    image_size: int = _get_int("IMAGE_SIZE", 640)
+    crop_mode: bool = _get_bool("CROP_MODE", False)
     test_compress: bool = _get_bool("TEST_COMPRESS", False)
+    pdf_zoom: float = _get_float("PDF_ZOOM", 1.5)
+    save_ocr_results: bool = _get_bool("SAVE_OCR_RESULTS", False)
 
     # Prompts:
     # "<image>\nFree OCR. "

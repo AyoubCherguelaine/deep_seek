@@ -398,8 +398,7 @@ def convert_pdf_to_images(pdf_path: Path, out_dir: Path) -> List[Path]:
                 detail=f"PDF has {page_count} pages. Max allowed is {settings.max_pdf_pages}.",
             )
 
-        # 2x zoom gives decent OCR quality without exploding memory.
-        matrix = fitz.Matrix(2.0, 2.0)
+        matrix = fitz.Matrix(settings.pdf_zoom, settings.pdf_zoom)
 
         for idx in range(page_count):
             page = doc.load_page(idx)
@@ -501,7 +500,7 @@ def run_deepseek_ocr(
                     image_size=image_size,
                     crop_mode=crop_mode,
                     test_compress=test_compress,
-                    save_results=True,
+                    save_results=settings.save_ocr_results,
                 )
 
         text = ""
