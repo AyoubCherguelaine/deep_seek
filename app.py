@@ -10,6 +10,7 @@ import tempfile
 import time
 import traceback
 import types
+import warnings
 from contextlib import asynccontextmanager
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
@@ -40,6 +41,19 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("deepseek-ocr-api")
+
+warnings.filterwarnings(
+    "ignore",
+    message=r".*seen_tokens.*deprecated.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*get_max_cache\(\).*deprecated.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*attention layers in this model are transitioning.*",
+)
 
 
 # ---------------------------------------------------------
