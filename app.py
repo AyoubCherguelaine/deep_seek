@@ -3,6 +3,8 @@ import hmac
 import logging
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import time
 import traceback
@@ -105,6 +107,81 @@ def clear_cuda_cache() -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
+
+
+def get_cuda_capability() -> Optional[tuple[int, int]]:
+    if not torch.cuda.is_available():
+        return None
+    return torch.cuda.get_device_capability(0)
+
+
+def _flash_attention_importable() -> bool:
+    try:
+        import flash_attn  # noqa: F401
+        return True
+    except Exception as exc:
+        logger.info("flash-attn is not importable: %s", exc)
+        return False
+
+
+def _install_flash_attention() -> bool:
+    logger.warning(
+        "ALLOW_FLASH_ATTENTION_INSTALL=true. Attempting runtime install of flash-attn==2.7.3."
+    )
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "flash-attn==2.7.3",
+                "--no-build-isolation",
+            ],
+            check=True,
+        )
+    except Exception as exc:
+        logger.warning("flash-attn runtime install failed: %s", exc)
+        return False
+
+    return _flash_attention_importable()
+
+
+def select_attention_backend() -> str:
+    capability = get_cuda_capability()
+    if capability is None:
+        raise RuntimeError("CUDA is not available. This app expects an NVIDIA GPU.")
+
+    major, minor = capability
+    cc = major + minor / 10
+
+    logger.info(
+        "Detected CUDA device: %s | compute capability: %s.%s | torch: %s | torch CUDA: %s",
+        torch.cuda.get_device_name(0),
+        major,
+        minor,
+        torch.__version__,
+        torch.version.cuda,
+    )
+
+    if not settings.use_flash_attention:
+        logger.info("USE_FLASH_ATTENTION=false. Using sdpa attention backend.")
+        return "sdpa"
+
+    if cc < 8.0:
+        logger.info("Compute capability %.1f does not support flash_attention_2. Using sdpa.", cc)
+        return "sdpa"
+
+    if _flash_attention_importable():
+        logger.info("flash-attn is importable. Using flash_attention_2.")
+        return "flash_attention_2"
+
+    if settings.allow_flash_attention_install and _install_flash_attention():
+        logger.info("flash-attn installed and importable. Using flash_attention_2.")
+        return "flash_attention_2"
+
+    logger.warning("FlashAttention requested but unavailable. Using sdpa attention backend.")
+    return "sdpa"
 
 
 def is_pdf(filename: str, content_type: Optional[str]) -> bool:
@@ -294,15 +371,14 @@ def load_model() -> None:
         trust_remote_code=True,
     )
 
-    logger.info("Loading model: %s", settings.model_name)
+    attn_impl = select_attention_backend()
+    logger.info("Loading model: %s with attention backend: %s", settings.model_name, attn_impl)
 
     model_kwargs = {
         "trust_remote_code": True,
         "use_safetensors": True,
+        "_attn_implementation": attn_impl,
     }
-
-    if settings.use_flash_attention:
-        model_kwargs["_attn_implementation"] = "flash_attention_2"
 
     try:
         model = AutoModel.from_pretrained(
@@ -310,18 +386,19 @@ def load_model() -> None:
             **model_kwargs,
         )
     except Exception as exc:
-        if settings.use_flash_attention:
-            logger.warning(
-                "Flash attention model load failed. Retrying without flash attention. Error: %s",
-                exc,
-            )
-            model_kwargs.pop("_attn_implementation", None)
-            model = AutoModel.from_pretrained(
-                settings.model_name,
-                **model_kwargs,
-            )
-        else:
+        if attn_impl == "eager":
             raise
+
+        logger.warning(
+            "Model load failed with attention backend %s. Retrying with eager. Error: %s",
+            attn_impl,
+            exc,
+        )
+        model_kwargs["_attn_implementation"] = "eager"
+        model = AutoModel.from_pretrained(
+            settings.model_name,
+            **model_kwargs,
+        )
 
     model = model.eval().cuda().to(torch.bfloat16)
 

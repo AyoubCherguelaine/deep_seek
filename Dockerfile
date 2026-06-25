@@ -26,9 +26,9 @@ RUN pip install --upgrade pip setuptools wheel
 
 COPY requirements.txt /app/requirements.txt
 
-# RTX 5060 Ti / Blackwell: use CUDA 12.8 PyTorch wheels.
-# We install torch separately to force cu128.
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# RTX 50 / Blackwell: use the CUDA 12.8 PyTorch wheel stack.
+# Keep torch out of requirements.txt so pip cannot replace these wheels later.
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 RUN pip install -r /app/requirements.txt
 

@@ -27,13 +27,14 @@ class Settings:
     # Model
     model_name: str = os.getenv("MODEL_NAME", "deepseek-ai/DeepSeek-OCR-2")
     cuda_visible_devices: str = os.getenv("CUDA_VISIBLE_DEVICES", "0")
-    use_flash_attention: bool = _get_bool("USE_FLASH_ATTENTION", True)
+    use_flash_attention: bool = _get_bool("USE_FLASH_ATTENTION", False)
+    allow_flash_attention_install: bool = _get_bool("ALLOW_FLASH_ATTENTION_INSTALL", False)
 
     # OCR mode
-    # Safer 16GB default for single-GPU nodes.
-    base_size: int = _get_int("BASE_SIZE", 640)
-    image_size: int = _get_int("IMAGE_SIZE", 640)
-    crop_mode: bool = _get_bool("CROP_MODE", False)
+    # Mirrors the working notebook's OCR-2 crop-mode defaults for RTX 50.
+    base_size: int = _get_int("BASE_SIZE", 1024)
+    image_size: int = _get_int("IMAGE_SIZE", 768)
+    crop_mode: bool = _get_bool("CROP_MODE", True)
     test_compress: bool = _get_bool("TEST_COMPRESS", False)
 
     # Prompts:

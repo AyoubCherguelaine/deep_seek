@@ -9,6 +9,5 @@ addict
 easydict
 transformers==4.46.3
 tokenizers==0.20.3
-torch==2.6.0
 accelerate
 pyjwt==2.10.1
