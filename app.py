@@ -10,7 +10,9 @@ import tempfile
 import time
 import traceback
 from contextlib import asynccontextmanager
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -487,18 +489,20 @@ def run_deepseek_ocr(
         raise RuntimeError("Model is not loaded.")
 
     try:
+        captured_output = StringIO()
         with torch.inference_mode():
-            result = MODEL.infer(
-                TOKENIZER,
-                prompt=prompt,
-                image_file=str(image_path),
-                output_path=str(output_dir),
-                base_size=base_size,
-                image_size=image_size,
-                crop_mode=crop_mode,
-                test_compress=test_compress,
-                save_results=True,
-            )
+            with redirect_stdout(captured_output):
+                result = MODEL.infer(
+                    TOKENIZER,
+                    prompt=prompt,
+                    image_file=str(image_path),
+                    output_path=str(output_dir),
+                    base_size=base_size,
+                    image_size=image_size,
+                    crop_mode=crop_mode,
+                    test_compress=test_compress,
+                    save_results=True,
+                )
 
         text = ""
         if result is not None:
@@ -506,6 +510,9 @@ def run_deepseek_ocr(
 
         if not text.strip():
             text = _read_saved_ocr_text(output_dir)
+
+        if not text.strip():
+            text = captured_output.getvalue()
 
         return _clean_ocr_text(text)
 
