@@ -1,10 +1,10 @@
 # DeepSeek OCR API
 
-FastAPI service for running DeepSeek-OCR on an NVIDIA GPU. The app accepts image and PDF uploads, converts PDF pages to images, and returns OCR text per page.
+FastAPI service for running DeepSeek-OCR on an NVIDIA GPU. The app accepts single image uploads or batches of images and returns OCR text per image.
 
 ## Features
 
-- OCR for PNG, JPG, JPEG, WEBP, BMP, TIFF, and PDF
+- OCR for PNG, JPG, JPEG, WEBP, BMP, TIFF
 - Optional bearer-token auth
 - Eager attention by default for DeepSeek-OCR-2
 - Local uvicorn runtime
@@ -32,7 +32,7 @@ cp .env.example .env
 - `MODEL_NAME` controls the Hugging Face model
 - `USE_FLASH_ATTENTION=true` tries `flash_attention_2` only when `flash-attn` is importable; otherwise the app uses eager attention
 - `ALLOW_FLASH_ATTENTION_INSTALL=true` allows runtime install of `flash-attn==2.7.3`
-- `BASE_SIZE`, `IMAGE_SIZE`, `CROP_MODE`, `PDF_ZOOM`, and `TEST_COMPRESS` tune OCR speed/quality
+- `BASE_SIZE`, `IMAGE_SIZE`, `CROP_MODE`, and `TEST_COMPRESS` tune OCR speed/quality
 
 3. Start the app:
 
@@ -103,7 +103,7 @@ The script reads `AUTH_API_KEY` from `.env`, signs the same JWT the server would
 ```bash
 curl -X POST http://localhost:8000/ocr \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "file=@invoice.pdf"
+  -F "files=@invoice.png"
 ```
 
 ## API
@@ -129,25 +129,25 @@ Form fields:
 
 ### `POST /ocr`
 
-Uploads one image or PDF for OCR.
+Uploads one image or a batch of images for OCR.
 
 Form fields:
 
-- `file` - required upload
+- `files` - one or more image uploads
 
 OCR settings are read from `.env`; this endpoint does not accept per-request model options.
 
 Supported inputs:
 
 - Images: `.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp`, `.tiff`, `.tif`
-- PDFs: converted page by page with PyMuPDF
 
 Example:
 
 ```bash
 curl -X POST http://localhost:8000/ocr \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "file=@document.pdf"
+  -F "files=@image1.png" \
+  -F "files=@image2.jpg"
 ```
 
 ## Environment Variables
@@ -167,11 +167,9 @@ All configuration comes from environment variables.
 - `IMAGE_SIZE` - OCR image size, default `640`
 - `CROP_MODE` - crop mode toggle, default `true`
 - `TEST_COMPRESS` - compression test toggle, default `false`
-- `PDF_ZOOM` - PDF render scale, default `1.5`; use `2.0` for higher quality
 - `SAVE_OCR_RESULTS` - writes model output files before reading them, default `false`
 - `DEFAULT_PROMPT` - default OCR prompt
 - `MAX_UPLOAD_MB` - upload limit in MB, default `40`
-- `MAX_PDF_PAGES` - max PDF pages, default `10`
 - `REQUEST_TIMEOUT_SECONDS` - per-page OCR timeout, default `180`
 - `TEMP_DIR` - temporary working directory, default `/tmp/deepseek_ocr`
 - `AUTH_API_KEY` - shared secret for token issuance
@@ -180,7 +178,6 @@ All configuration comes from environment variables.
 ## Notes
 
 - The app defaults to eager attention for DeepSeek-OCR-2.
-- For higher quality but slower OCR, use `BASE_SIZE=1024`, `IMAGE_SIZE=768`, and `PDF_ZOOM=2.0`.
+- For higher quality but slower OCR, use `BASE_SIZE=1024` and `IMAGE_SIZE=768`.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.
-- PDFs require `pymupdf`, which is already listed in `requirements.txt`.
 - A single GPU request is processed at a time to reduce CUDA out-of-memory issues.

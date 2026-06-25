@@ -203,13 +203,6 @@ def select_attention_backend() -> str:
     return "eager"
 
 
-def is_pdf(filename: str, content_type: Optional[str]) -> bool:
-    return (
-        filename.lower().endswith(".pdf")
-        or content_type == "application/pdf"
-    )
-
-
 def is_image(filename: str, content_type: Optional[str]) -> bool:
     image_exts = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
     suffix = Path(filename.lower()).suffix
@@ -464,53 +457,6 @@ async def require_bearer(
     return payload
 
 
-def convert_pdf_to_images(pdf_path: Path, out_dir: Path) -> List[Path]:
-    """
-    Converts PDF pages to PNG using PyMuPDF.
-    Install dependency:
-        pip install pymupdf
-    """
-    try:
-        import fitz  # PyMuPDF
-    except ImportError:
-        raise HTTPException(
-            status_code=500,
-            detail="PDF support requires pymupdf. Install it with: pip install pymupdf",
-        )
-
-    image_paths: List[Path] = []
-
-    try:
-        doc = fitz.open(str(pdf_path))
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Could not open PDF: {exc}")
-
-    try:
-        page_count = len(doc)
-        if page_count == 0:
-            raise HTTPException(status_code=400, detail="PDF has no pages.")
-
-        if page_count > settings.max_pdf_pages:
-            raise HTTPException(
-                status_code=413,
-                detail=f"PDF has {page_count} pages. Max allowed is {settings.max_pdf_pages}.",
-            )
-
-        matrix = fitz.Matrix(settings.pdf_zoom, settings.pdf_zoom)
-
-        for idx in range(page_count):
-            page = doc.load_page(idx)
-            pix = page.get_pixmap(matrix=matrix, alpha=False)
-            out_path = out_dir / f"page_{idx + 1}.png"
-            pix.save(str(out_path))
-            image_paths.append(out_path)
-
-    finally:
-        doc.close()
-
-    return image_paths
-
-
 def load_model() -> None:
     global MODEL, TOKENIZER
 
@@ -699,6 +645,16 @@ async def health() -> HealthResponse:
     )
 
 
+@app.get("/portal-resolver", include_in_schema=False)
+async def portal_resolver() -> Dict[str, Any]:
+    return {
+        "ok": True,
+        "service": settings.app_name,
+        "health": "/health",
+        "ocr": "/ocr",
+    }
+
+
 @app.post("/auth/token", response_model=TokenResponse)
 async def auth_token(
     api_key: str = Form(...),
@@ -732,7 +688,8 @@ async def auth_token(
 
 @app.post("/ocr", response_model=OCRResponse)
 async def ocr(
-    file: UploadFile = File(...),
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
     _claims: Dict[str, Any] = Depends(require_bearer),
 ) -> OCRResponse:
     """
@@ -740,23 +697,21 @@ async def ocr(
 
     Supports:
     - PNG/JPG/JPEG/WEBP/BMP/TIFF
-    - PDF, converted page-by-page to images
 
     Example:
         curl -X POST http://localhost:8000/ocr \
-          -F "file=@invoice.pdf"
+          -F "files=@image1.png" \
+          -F "files=@image2.png"
     """
 
     started = time.perf_counter()
 
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Missing filename.")
+    uploaded_files = list(files or [])
+    if file is not None:
+        uploaded_files.append(file)
 
-    if not is_image(file.filename, file.content_type) and not is_pdf(file.filename, file.content_type):
-        raise HTTPException(
-            status_code=415,
-            detail="Unsupported file type. Upload an image or PDF.",
-        )
+    if not uploaded_files:
+        raise HTTPException(status_code=400, detail="At least one image file is required.")
 
     used_prompt = _normalize_prompt(None)
     used_base_size = _validate_positive_int(
@@ -771,34 +726,37 @@ async def ocr(
     used_test_compress = settings.test_compress
 
     request_dir = Path(tempfile.mkdtemp(prefix="ocr_", dir=settings.temp_dir))
-    input_path = request_dir / file.filename
     output_dir = request_dir / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        await save_upload_to_disk(file, input_path)
-
-        if is_pdf(file.filename, file.content_type):
-            image_paths = convert_pdf_to_images(input_path, request_dir)
-            file_type = "pdf"
-        else:
-            validate_image(input_path)
-            image_paths = [input_path]
-            file_type = "image"
-
         results: List[OCRPageResult] = []
 
         # DeepSeek-OCR on one 16GB GPU should run one request at a time.
         # This prevents CUDA OOM when multiple users hit the API.
         async with MODEL_LOCK:
-            for idx, image_path in enumerate(image_paths, start=1):
-                page_output_dir = output_dir / f"page_{idx}"
+            for idx, upload in enumerate(uploaded_files, start=1):
+                if not upload.filename:
+                    raise HTTPException(status_code=400, detail="Missing filename.")
+
+                if not is_image(upload.filename, upload.content_type):
+                    raise HTTPException(
+                        status_code=415,
+                        detail="Unsupported file type. Upload images only.",
+                    )
+
+                safe_filename = Path(upload.filename).name
+                input_path = request_dir / f"{idx}_{safe_filename}"
+                page_output_dir = output_dir / f"image_{idx}"
                 page_output_dir.mkdir(parents=True, exist_ok=True)
+
+                await save_upload_to_disk(upload, input_path)
+                validate_image(input_path)
 
                 text = await asyncio.wait_for(
                     asyncio.to_thread(
                         run_deepseek_ocr,
-                        image_path,
+                        input_path,
                         page_output_dir,
                         used_prompt,
                         used_base_size,
@@ -815,8 +773,8 @@ async def ocr(
 
         return OCRResponse(
             ok=True,
-            filename=file.filename,
-            file_type=file_type,
+            filename=uploaded_files[0].filename or "",
+            file_type="image",
             pages=len(results),
             elapsed_seconds=elapsed,
             results=results,

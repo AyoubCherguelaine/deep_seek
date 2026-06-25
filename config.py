@@ -64,7 +64,6 @@ class Settings:
     image_size: int = _get_int("IMAGE_SIZE", 640)
     crop_mode: bool = _get_bool("CROP_MODE", True)
     test_compress: bool = _get_bool("TEST_COMPRESS", False)
-    pdf_zoom: float = _get_float("PDF_ZOOM", 1.5)
     save_ocr_results: bool = _get_bool("SAVE_OCR_RESULTS", False)
 
     # Prompts:
@@ -77,7 +76,6 @@ class Settings:
 
     # Upload limits
     max_upload_mb: int = _get_int("MAX_UPLOAD_MB", 40)
-    max_pdf_pages: int = _get_int("MAX_PDF_PAGES", 10)
 
     # Runtime
     request_timeout_seconds: int = _get_int("REQUEST_TIMEOUT_SECONDS", 180)
