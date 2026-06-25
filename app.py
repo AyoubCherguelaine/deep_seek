@@ -2,6 +2,7 @@ import asyncio
 import hmac
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -256,6 +257,40 @@ def _validate_positive_int(name: str, value: int) -> int:
     return value
 
 
+def _clean_ocr_text(text: str) -> str:
+    text = re.sub(r"<\|ref\|>.*?<\|/ref\|>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<\|det\|>.*?<\|/det\|>", "", text, flags=re.DOTALL)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line).strip()
+
+
+def _read_saved_ocr_text(output_dir: Path) -> str:
+    if not output_dir.exists():
+        return ""
+
+    text_files = sorted(
+        path
+        for path in output_dir.rglob("*")
+        if path.is_file() and path.suffix.lower() in {".md", ".txt", ".json"}
+    )
+
+    chunks: List[str] = []
+    for path in text_files:
+        try:
+            content = path.read_text(encoding="utf-8").strip()
+        except UnicodeDecodeError:
+            content = path.read_text(errors="ignore").strip()
+        except Exception:
+            logger.debug("Could not read OCR output file: %s", path)
+            continue
+
+        if content:
+            chunks.append(content)
+
+    return "\n\n".join(chunks).strip()
+
+
 # ---------------------------------------------------------
 # Auth (long-lived bearer tokens, ~1 year)
 # ---------------------------------------------------------
@@ -462,16 +497,17 @@ def run_deepseek_ocr(
                 image_size=image_size,
                 crop_mode=crop_mode,
                 test_compress=test_compress,
-                save_results=False,
+                save_results=True,
             )
 
-        if result is None:
-            return ""
+        text = ""
+        if result is not None:
+            text = result if isinstance(result, str) else str(result)
 
-        if isinstance(result, str):
-            return result.strip()
+        if not text.strip():
+            text = _read_saved_ocr_text(output_dir)
 
-        return str(result).strip()
+        return _clean_ocr_text(text)
 
     except torch.cuda.OutOfMemoryError:
         clear_cuda_cache()
@@ -628,11 +664,14 @@ async def ocr(
         # This prevents CUDA OOM when multiple users hit the API.
         async with MODEL_LOCK:
             for idx, image_path in enumerate(image_paths, start=1):
+                page_output_dir = output_dir / f"page_{idx}"
+                page_output_dir.mkdir(parents=True, exist_ok=True)
+
                 text = await asyncio.wait_for(
                     asyncio.to_thread(
                         run_deepseek_ocr,
                         image_path,
-                        output_dir,
+                        page_output_dir,
                         used_prompt,
                         used_base_size,
                         used_image_size,
