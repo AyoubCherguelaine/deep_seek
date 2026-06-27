@@ -688,8 +688,7 @@ async def auth_token(
 
 @app.post("/ocr", response_model=OCRResponse)
 async def ocr(
-    files: Optional[List[UploadFile]] = File(None),
-    file: Optional[UploadFile] = File(None),
+    file: UploadFile = File(...),
     _claims: Dict[str, Any] = Depends(require_bearer),
 ) -> OCRResponse:
     """
@@ -704,16 +703,6 @@ async def ocr(
     """
 
     started = time.perf_counter()
-
-    uploaded_files = list(files or [])
-    if file is not None:
-        uploaded_files.append(file)
-
-    if not uploaded_files:
-        raise HTTPException(status_code=400, detail="One image file is required.")
-
-    if len(uploaded_files) > 1:
-        raise HTTPException(status_code=400, detail="Only one image file is allowed per request.")
 
     used_prompt = _normalize_prompt(None)
     used_base_size = _validate_positive_int(
@@ -733,26 +722,25 @@ async def ocr(
 
     try:
         results: List[OCRPageResult] = []
-        upload = uploaded_files[0]
 
         # DeepSeek-OCR on one 16GB GPU should run one request at a time.
         # This prevents CUDA OOM when multiple users hit the API.
         async with MODEL_LOCK:
-            if not upload.filename:
+            if not file.filename:
                 raise HTTPException(status_code=400, detail="Missing filename.")
 
-            if not is_image(upload.filename, upload.content_type):
+            if not is_image(file.filename, file.content_type):
                 raise HTTPException(
                     status_code=415,
                     detail="Unsupported file type. Upload images only.",
                 )
 
-            safe_filename = Path(upload.filename).name
+            safe_filename = Path(file.filename).name
             input_path = request_dir / safe_filename
             page_output_dir = output_dir / "image_1"
             page_output_dir.mkdir(parents=True, exist_ok=True)
 
-            await save_upload_to_disk(upload, input_path)
+            await save_upload_to_disk(file, input_path)
             validate_image(input_path)
 
             text = await asyncio.wait_for(
@@ -775,7 +763,7 @@ async def ocr(
 
         return OCRResponse(
             ok=True,
-            filename=uploaded_files[0].filename or "",
+            filename=file.filename or "",
             file_type="image",
             pages=len(results),
             elapsed_seconds=elapsed,
