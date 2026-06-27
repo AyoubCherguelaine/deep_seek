@@ -1,6 +1,6 @@
 # DeepSeek OCR API
 
-FastAPI service for running DeepSeek-OCR on an NVIDIA GPU. The app accepts single image uploads or batches of images and returns OCR text per image.
+FastAPI service for running DeepSeek-OCR on an NVIDIA GPU. The app accepts one image upload per request and returns OCR text for that image.
 
 ## Features
 
@@ -103,7 +103,7 @@ The script reads `AUTH_API_KEY` from `.env`, signs the same JWT the server would
 ```bash
 curl -X POST http://localhost:8000/ocr \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "files=@invoice.png"
+  -F "file=@invoice.png"
 ```
 
 ## API
@@ -129,11 +129,11 @@ Form fields:
 
 ### `POST /ocr`
 
-Uploads one image or a batch of images for OCR.
+Uploads one image for OCR.
 
 Form fields:
 
-- `files` - one or more image uploads
+- `file` - required image upload
 
 OCR settings are read from `.env`; this endpoint does not accept per-request model options.
 
@@ -146,8 +146,7 @@ Example:
 ```bash
 curl -X POST http://localhost:8000/ocr \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "files=@image1.png" \
-  -F "files=@image2.jpg"
+  -F "file=@image.png"
 ```
 
 ## Environment Variables

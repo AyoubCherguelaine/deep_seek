@@ -700,8 +700,7 @@ async def ocr(
 
     Example:
         curl -X POST http://localhost:8000/ocr \
-          -F "files=@image1.png" \
-          -F "files=@image2.png"
+          -F "file=@image.png"
     """
 
     started = time.perf_counter()
@@ -711,7 +710,10 @@ async def ocr(
         uploaded_files.append(file)
 
     if not uploaded_files:
-        raise HTTPException(status_code=400, detail="At least one image file is required.")
+        raise HTTPException(status_code=400, detail="One image file is required.")
+
+    if len(uploaded_files) > 1:
+        raise HTTPException(status_code=400, detail="Only one image file is allowed per request.")
 
     used_prompt = _normalize_prompt(None)
     used_base_size = _validate_positive_int(
@@ -731,43 +733,43 @@ async def ocr(
 
     try:
         results: List[OCRPageResult] = []
+        upload = uploaded_files[0]
 
         # DeepSeek-OCR on one 16GB GPU should run one request at a time.
         # This prevents CUDA OOM when multiple users hit the API.
         async with MODEL_LOCK:
-            for idx, upload in enumerate(uploaded_files, start=1):
-                if not upload.filename:
-                    raise HTTPException(status_code=400, detail="Missing filename.")
+            if not upload.filename:
+                raise HTTPException(status_code=400, detail="Missing filename.")
 
-                if not is_image(upload.filename, upload.content_type):
-                    raise HTTPException(
-                        status_code=415,
-                        detail="Unsupported file type. Upload images only.",
-                    )
-
-                safe_filename = Path(upload.filename).name
-                input_path = request_dir / f"{idx}_{safe_filename}"
-                page_output_dir = output_dir / f"image_{idx}"
-                page_output_dir.mkdir(parents=True, exist_ok=True)
-
-                await save_upload_to_disk(upload, input_path)
-                validate_image(input_path)
-
-                text = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        run_deepseek_ocr,
-                        input_path,
-                        page_output_dir,
-                        used_prompt,
-                        used_base_size,
-                        used_image_size,
-                        used_crop_mode,
-                        used_test_compress,
-                    ),
-                    timeout=settings.request_timeout_seconds,
+            if not is_image(upload.filename, upload.content_type):
+                raise HTTPException(
+                    status_code=415,
+                    detail="Unsupported file type. Upload images only.",
                 )
 
-                results.append(OCRPageResult(page=idx, text=text))
+            safe_filename = Path(upload.filename).name
+            input_path = request_dir / safe_filename
+            page_output_dir = output_dir / "image_1"
+            page_output_dir.mkdir(parents=True, exist_ok=True)
+
+            await save_upload_to_disk(upload, input_path)
+            validate_image(input_path)
+
+            text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    run_deepseek_ocr,
+                    input_path,
+                    page_output_dir,
+                    used_prompt,
+                    used_base_size,
+                    used_image_size,
+                    used_crop_mode,
+                    used_test_compress,
+                ),
+                timeout=settings.request_timeout_seconds,
+            )
+
+            results.append(OCRPageResult(page=1, text=text))
 
         elapsed = round(time.perf_counter() - started, 3)
 

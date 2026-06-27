@@ -10,3 +10,4 @@ transformers==4.46.3
 tokenizers==0.20.3
 accelerate
 pyjwt==2.10.1
+torchvision
