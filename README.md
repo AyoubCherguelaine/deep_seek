@@ -159,7 +159,8 @@ Response shape:
 - `IMAGE_SIZE_BASE` - `/ocr/base` image size, default `1024`
 - `BASE_SIZE_LONG` - `/ocr/long` base size, default `1024`
 - `IMAGE_SIZE_LONG` - `/ocr/long` image size, default `640`
-- `MAX_LENGTH` - generation max length, default `8192`
+- `MAX_LENGTH_BASE` - `/ocr/base` generation max length, default `8192`
+- `MAX_LENGTH_LONG` - `/ocr/long` generation max length, default `4096`; lower this to cap slow repeated-generation pages
 - `NO_REPEAT_NGRAM_SIZE` - repeat control size, default `35`
 - `NGRAM_WINDOW` - n-gram window, default `128`
 - `PDF_DPI` - PDF rasterization DPI, default `200`
@@ -176,5 +177,5 @@ Response shape:
 - PDFs are converted to PNG pages with PyMuPDF before OCR.
 - `/ocr/base` accepts images and PDFs.
 - `/ocr/long` accepts images and PDFs.
-- The default prompt asks the model not to transcribe Quranic verse text. It should return only the surah and ayah reference when detected.
+- The default prompt asks the model to skip Quranic verse regions immediately. The API also redacts quoted text after common Quran-introduction phrases such as `قال تعالى` before returning the response.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.

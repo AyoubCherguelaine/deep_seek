@@ -47,16 +47,25 @@ class Settings:
     image_size_base: int = _get_int("IMAGE_SIZE_BASE", 1024)
     base_size_long: int = _get_int("BASE_SIZE_LONG", 1024)
     image_size_long: int = _get_int("IMAGE_SIZE_LONG", 640)
-    max_length: int = _get_int("MAX_LENGTH", 8192)
+    max_length_base: int = _get_int("MAX_LENGTH_BASE", _get_int("MAX_LENGTH", 8192))
+    max_length_long: int = _get_int("MAX_LENGTH_LONG", 4096)
     no_repeat_ngram_size: int = _get_int("NO_REPEAT_NGRAM_SIZE", 35)
     ngram_window: int = _get_int("NGRAM_WINDOW", 128)
     default_prompt: str = os.getenv(
         "DEFAULT_PROMPT",
         (
-            "document parsing. If Quranic verses are present, do not transcribe the "
-            "verse text. Instead identify only the surah name or number and the ayah "
-            "number when visible or confidently inferable. If uncertain, write "
-            "'Quranic verse detected - surah unknown, ayah unknown'."
+            "document parsing. Convert the document to clean Markdown. Preserve Arabic "
+            "text exactly. Preserve mathematics, physics, chemistry, and technical "
+            "notation as valid LaTeX. Preserve tables as Markdown tables. For figures, "
+            "diagrams, charts, photos, boxed regions, highlighted areas, questions, and "
+            "answers, include a short description and bounding box coordinates when "
+            "visible or provided by the model. If Quranic verses are present anywhere, "
+            "including inside tables or quotes after phrases such as 'قال تعالى', do not "
+            "OCR, read, spell, or transcribe the verse characters. Skip that region "
+            "immediately and output only the surah name or number and the ayah number "
+            "when visible or confidently inferable. If uncertain, write 'Quranic verse "
+            "detected - surah unknown, ayah unknown'. Do not continue generating repeated "
+            "verse fragments. Do not invent missing text."
         ),
     )
 

@@ -2,6 +2,7 @@ import asyncio
 import hmac
 import logging
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -30,6 +31,7 @@ logger = logging.getLogger("unlimited-ocr-api")
 MODEL = None
 TOKENIZER = None
 MODEL_LOCK = asyncio.Lock()
+QURAN_REDACTION = "[آية قرآنية محذوفة - يرجى مراجعة المصدر المعتمد لتحديد السورة ورقم الآية]"
 
 
 class HealthResponse(BaseModel):
@@ -196,6 +198,37 @@ def collect_output(out_dir: Path) -> str:
     return "\n\n".join(chunks).strip()
 
 
+def redact_quranic_verses(text: str) -> str:
+    if not text:
+        return text
+
+    quote_chars = '"“”«»'
+    trigger = r"(?:قال\s+تعالى|قوله\s+تعالى|قال\s+الله\s+تعالى)"
+
+    patterns = [
+        rf"({trigger}\s*[:：]?\s*)[«“\"](.+?)[»”\"]",
+        rf"({trigger}\s*[:：]?\s*)'(.+?)'",
+        rf"({trigger}\s*[:：]?\s*)([^<\n\r]{{20,}})",
+    ]
+
+    redacted = text
+    for pattern in patterns:
+        redacted = re.sub(
+            pattern,
+            rf"\1{QURAN_REDACTION}",
+            redacted,
+            flags=re.DOTALL,
+        )
+
+    # Clean accidental leftovers from repeated OCR hallucinations after redaction.
+    redacted = re.sub(
+        rf"{re.escape(QURAN_REDACTION)}(?:\s*[{re.escape(quote_chars)}]?\s*[\(\[]?\d+[\)\]]?[{re.escape(quote_chars)}]?)+",
+        QURAN_REDACTION,
+        redacted,
+    )
+    return redacted
+
+
 def load_model() -> None:
     global MODEL, TOKENIZER
 
@@ -235,6 +268,7 @@ def run_model_infer(
     image_size: int,
     crop_mode: bool,
     use_ngram: bool,
+    max_length: int,
 ) -> str:
     if MODEL is None or TOKENIZER is None:
         raise RuntimeError("Model is not loaded.")
@@ -249,7 +283,7 @@ def run_model_infer(
                 "base_size": base_size,
                 "image_size": image_size,
                 "crop_mode": crop_mode,
-                "max_length": settings.max_length,
+                "max_length": max_length,
                 "save_results": True,
             }
 
@@ -262,8 +296,8 @@ def run_model_infer(
 
             text = collect_output(out_dir)
             if text:
-                return text
-            return "" if result is None else str(result).strip()
+                return redact_quranic_verses(text)
+            return redact_quranic_verses("" if result is None else str(result).strip())
     except torch.cuda.OutOfMemoryError:
         clear_cuda_cache()
         raise HTTPException(
@@ -284,6 +318,7 @@ async def ocr_pages(
     image_size: int,
     crop_mode: bool,
     use_ngram: bool,
+    max_length: int,
 ) -> List[OCRPageResult]:
     results: List[OCRPageResult] = []
 
@@ -299,6 +334,7 @@ async def ocr_pages(
                         image_size,
                         crop_mode,
                         use_ngram,
+                        max_length,
                     ),
                     timeout=settings.request_timeout_seconds,
                 )
@@ -469,6 +505,7 @@ async def ocr_base(
             settings.image_size_base,
             crop_mode=False,
             use_ngram=True,
+            max_length=settings.max_length_base,
         )
 
     return OCRResponse(
@@ -515,6 +552,7 @@ async def ocr_long(
             settings.image_size_long,
             crop_mode=True,
             use_ngram=use_ngram,
+            max_length=settings.max_length_long,
         )
 
     return OCRResponse(
