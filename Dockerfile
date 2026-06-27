@@ -28,7 +28,7 @@ COPY requirements.txt /app/requirements.txt
 
 # RTX 50 / Blackwell: use the CUDA 12.8 PyTorch wheel stack.
 # Keep torch out of requirements.txt so pip cannot replace these wheels later.
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+RUN pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 
 RUN pip install -r /app/requirements.txt
 
@@ -36,7 +36,7 @@ COPY app.py /app/app.py
 COPY config.py /app/config.py
 COPY .env.example /app/.env.example
 
-RUN mkdir -p /tmp/deepseek_ocr /root/.cache/huggingface
+RUN mkdir -p /tmp/unlimited_ocr /root/.cache/huggingface
 
 EXPOSE 8000
 
