@@ -50,7 +50,15 @@ class Settings:
     max_length: int = _get_int("MAX_LENGTH", 8192)
     no_repeat_ngram_size: int = _get_int("NO_REPEAT_NGRAM_SIZE", 35)
     ngram_window: int = _get_int("NGRAM_WINDOW", 128)
-    default_prompt: str = os.getenv("DEFAULT_PROMPT", "document parsing.")
+    default_prompt: str = os.getenv(
+        "DEFAULT_PROMPT",
+        (
+            "document parsing. If Quranic verses are present, do not transcribe the "
+            "verse text. Instead identify only the surah name or number and the ayah "
+            "number when visible or confidently inferable. If uncertain, write "
+            "'Quranic verse detected - surah unknown, ayah unknown'."
+        ),
+    )
 
     # Upload/runtime
     max_upload_mb: int = _get_int("MAX_UPLOAD_MB", 80)

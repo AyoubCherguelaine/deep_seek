@@ -93,7 +93,7 @@ Accurate OCR for one image or PDF. This matches the Space's Base mode.
 Form fields:
 
 - `file` - required image or PDF upload
-- `prompt` - optional, defaults to `document parsing.`
+- `prompt` - optional, defaults to the configured Quran-safe document parsing prompt
 
 Example:
 
@@ -110,7 +110,7 @@ Long document OCR for one image or PDF. This matches the Space's Long mode, call
 Form fields:
 
 - `file` - required image or PDF upload
-- `prompt` - optional, defaults to `document parsing.`
+- `prompt` - optional, defaults to the configured Quran-safe document parsing prompt
 - `use_ngram` - optional boolean, defaults to `true`
 
 Examples:
@@ -156,7 +156,7 @@ Response shape:
 - `LOG_LEVEL` - log level, default `INFO`
 - `CUDA_VISIBLE_DEVICES` - GPU selection, default `0`
 - `MODEL_NAME` - Hugging Face model ID, default `baidu/Unlimited-OCR`
-- `DEFAULT_PROMPT` - default OCR prompt
+- `DEFAULT_PROMPT` - default OCR prompt; the provided default avoids transcribing Quranic verses and asks for surah/ayah identification only
 - `BASE_SIZE_BASE` - `/ocr/base` base size, default `1024`
 - `IMAGE_SIZE_BASE` - `/ocr/base` image size, default `1024`
 - `BASE_SIZE_LONG` - `/ocr/long` base size, default `1024`
@@ -178,4 +178,5 @@ Response shape:
 - PDFs are converted to PNG pages with PyMuPDF before OCR.
 - `/ocr/base` accepts images and PDFs.
 - `/ocr/long` accepts images and PDFs.
+- The default prompt asks the model not to transcribe Quranic verse text. It should return only the surah and ayah reference when detected.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.
