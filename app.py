@@ -164,11 +164,9 @@ def pdf_to_images(pdf_path: Path, output_dir: Path) -> List[Path]:
         doc.close()
 
 
-def normalize_prompt(prompt: Optional[str]) -> str:
-    value = settings.default_prompt if prompt is None else prompt
+def normalize_prompt() -> str:
+    value = settings.default_prompt
     value = value.replace("\\n", "\n").strip()
-    if not value:
-        value = settings.default_prompt.strip()
     if not value:
         raise HTTPException(status_code=400, detail="OCR prompt cannot be empty.")
     return value
@@ -441,7 +439,6 @@ async def auth_token(
 @app.post("/ocr/base", response_model=OCRResponse)
 async def ocr_base(
     file: UploadFile = File(...),
-    prompt: Optional[str] = Form(None),
     _: Dict[str, Any] = Depends(require_bearer),
 ) -> OCRResponse:
     start = time.perf_counter()
@@ -467,7 +464,7 @@ async def ocr_base(
 
         results = await ocr_pages(
             pages,
-            normalize_prompt(prompt),
+            normalize_prompt(),
             settings.base_size_base,
             settings.image_size_base,
             crop_mode=False,
@@ -487,7 +484,6 @@ async def ocr_base(
 @app.post("/ocr/long", response_model=OCRResponse)
 async def ocr_long(
     file: UploadFile = File(...),
-    prompt: Optional[str] = Form(None),
     use_ngram: bool = Form(True),
     _: Dict[str, Any] = Depends(require_bearer),
 ) -> OCRResponse:
@@ -514,7 +510,7 @@ async def ocr_long(
 
         results = await ocr_pages(
             pages,
-            normalize_prompt(prompt),
+            normalize_prompt(),
             settings.base_size_long,
             settings.image_size_long,
             crop_mode=True,

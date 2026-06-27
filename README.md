@@ -93,7 +93,6 @@ Accurate OCR for one image or PDF. This matches the Space's Base mode.
 Form fields:
 
 - `file` - required image or PDF upload
-- `prompt` - optional, defaults to the configured Quran-safe document parsing prompt
 
 Example:
 
@@ -110,7 +109,6 @@ Long document OCR for one image or PDF. This matches the Space's Long mode, call
 Form fields:
 
 - `file` - required image or PDF upload
-- `prompt` - optional, defaults to the configured Quran-safe document parsing prompt
 - `use_ngram` - optional boolean, defaults to `true`
 
 Examples:
@@ -156,7 +154,7 @@ Response shape:
 - `LOG_LEVEL` - log level, default `INFO`
 - `CUDA_VISIBLE_DEVICES` - GPU selection, default `0`
 - `MODEL_NAME` - Hugging Face model ID, default `baidu/Unlimited-OCR`
-- `DEFAULT_PROMPT` - default OCR prompt; the provided default avoids transcribing Quranic verses and asks for surah/ayah identification only
+- `DEFAULT_PROMPT` - required service-level OCR prompt; callers cannot override it per request
 - `BASE_SIZE_BASE` - `/ocr/base` base size, default `1024`
 - `IMAGE_SIZE_BASE` - `/ocr/base` image size, default `1024`
 - `BASE_SIZE_LONG` - `/ocr/long` base size, default `1024`
