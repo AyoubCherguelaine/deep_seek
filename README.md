@@ -166,7 +166,7 @@ Response shape:
 - `PDF_DPI` - PDF rasterization DPI, default `200`
 - `MAX_PDF_PAGES` - PDF page limit, default `200`
 - `MAX_UPLOAD_MB` - upload limit in MB, default `80`
-- `REQUEST_TIMEOUT_SECONDS` - per-page OCR timeout, default `300`
+- `REQUEST_TIMEOUT_SECONDS` - per-page OCR timeout, default `600` (10 minutes)
 - `TEMP_DIR` - temporary working directory, default `/tmp/unlimited_ocr`
 - `AUTH_API_KEY` - shared secret for token issuance
 - `AUTH_TOKEN_TTL_DAYS` - bearer token lifetime, default `365`

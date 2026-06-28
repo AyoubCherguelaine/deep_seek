@@ -73,7 +73,7 @@ class Settings:
     max_upload_mb: int = _get_int("MAX_UPLOAD_MB", 80)
     max_pdf_pages: int = _get_int("MAX_PDF_PAGES", 200)
     pdf_dpi: int = _get_int("PDF_DPI", 200)
-    request_timeout_seconds: int = _get_int("REQUEST_TIMEOUT_SECONDS", 300)
+    request_timeout_seconds: int = _get_int("REQUEST_TIMEOUT_SECONDS", 600)
     temp_dir: str = os.getenv("TEMP_DIR", "/tmp/unlimited_ocr")
     image_extensions: set[str] = field(
         default_factory=lambda: {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}

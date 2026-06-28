@@ -6,6 +6,7 @@ import re
 import shutil
 import tempfile
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -13,7 +14,10 @@ from typing import Any, Dict, List, Optional
 
 import jwt
 import torch
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
@@ -61,6 +65,59 @@ class OCRResponse(BaseModel):
     pages: int
     elapsed_seconds: float
     results: List[OCRPageResult]
+
+
+def request_id_from(request: Request) -> str:
+    value = getattr(request.state, "request_id", None)
+    return value or "unknown"
+
+
+def error_code(status_code: int) -> str:
+    codes = {
+        400: "bad_request",
+        401: "unauthorized",
+        403: "forbidden",
+        404: "not_found",
+        405: "method_not_allowed",
+        413: "payload_too_large",
+        422: "validation_error",
+        500: "internal_server_error",
+        503: "service_unavailable",
+        504: "timeout",
+        507: "insufficient_storage",
+    }
+    return codes.get(status_code, "http_error")
+
+
+def error_response(
+    request: Request,
+    status_code: int,
+    message: str,
+    *,
+    details: Optional[Any] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> JSONResponse:
+    request_id = request_id_from(request)
+    payload: Dict[str, Any] = {
+        "ok": False,
+        "error": {
+            "code": error_code(status_code),
+            "message": message,
+            "request_id": request_id,
+        },
+    }
+    if details is not None:
+        payload["error"]["details"] = details
+
+    response_headers = {"X-Request-ID": request_id}
+    if headers:
+        response_headers.update(headers)
+
+    return JSONResponse(
+        status_code=status_code,
+        content=jsonable_encoder(payload),
+        headers=response_headers,
+    )
 
 
 def ensure_temp_dir() -> None:
@@ -306,9 +363,12 @@ def run_model_infer(
         )
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
         logger.exception("OCR inference failed.")
-        raise HTTPException(status_code=500, detail=f"OCR inference failed: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="OCR inference failed. Check server logs with the response request_id.",
+        )
 
 
 async def ocr_pages(
@@ -440,6 +500,79 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    request.state.request_id = request_id
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "Unhandled request error. method=%s path=%s request_id=%s",
+            request.method,
+            request.url.path,
+            request_id,
+        )
+        raise
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    level = logging.ERROR if exc.status_code >= 500 else logging.WARNING
+    logger.log(
+        level,
+        "HTTP error. status=%s method=%s path=%s request_id=%s detail=%s",
+        exc.status_code,
+        request.method,
+        request.url.path,
+        request_id_from(request),
+        exc.detail,
+    )
+    return error_response(
+        request,
+        exc.status_code,
+        str(exc.detail),
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    logger.warning(
+        "Request validation failed. method=%s path=%s request_id=%s errors=%s",
+        request.method,
+        request.url.path,
+        request_id_from(request),
+        exc.errors(),
+    )
+    return error_response(
+        request,
+        422,
+        "Request validation failed.",
+        details=exc.errors(),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception(
+        "Unhandled exception. method=%s path=%s request_id=%s",
+        request.method,
+        request.url.path,
+        request_id_from(request),
+    )
+    return error_response(
+        request,
+        500,
+        "Internal server error. Check server logs with the response request_id.",
+    )
 
 
 @app.get("/health", response_model=HealthResponse)
