@@ -33,7 +33,7 @@ def _get_int(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     # Server
-    app_name: str = os.getenv("APP_NAME", "unlimited-ocr-api")
+    app_name: str = os.getenv("APP_NAME", "vision-ocr-service")
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = _get_int("PORT", 8000)
     workers: int = _get_int("WORKERS", 1)

@@ -1,4 +1,4 @@
-# Unlimited OCR API
+# Vision OCR Service
 
 FastAPI service for running `baidu/Unlimited-OCR` on an NVIDIA GPU. It exposes a small JSON API for accurate single-image OCR and long document OCR with optional n-gram repeat control.
 
@@ -33,8 +33,8 @@ The service listens on `http://localhost:8000`.
 Build and run directly:
 
 ```bash
-docker build -t unlimited-ocr-api:latest .
-docker run --gpus all --env-file .env -p 8000:8000 unlimited-ocr-api:latest
+docker build -t vision-ocr-service:latest .
+docker run --gpus all --env-file .env -p 8000:8000 vision-ocr-service:latest
 ```
 
 Or use Docker Compose:
@@ -46,7 +46,7 @@ docker compose up --build
 Verify the CUDA/PyTorch stack inside the image:
 
 ```bash
-docker run --rm --gpus all unlimited-ocr-api:latest \
+docker run --rm --gpus all vision-ocr-service:latest \
   python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.cuda.get_device_name(0)); print(torch.cuda.get_device_capability(0))"
 ```
 
