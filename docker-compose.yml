@@ -1,12 +1,12 @@
 services:
-  deepseek-ocr-api:
+  unlimited-ocr-api:
     build:
       context: .
       dockerfile: Dockerfile
 
-    image: deepseek-ocr-api:latest
+    image: unlimited-ocr-api:latest
 
-    container_name: deepseek-ocr-api
+    container_name: unlimited-ocr-api
 
     restart: unless-stopped
 
@@ -22,7 +22,7 @@ services:
 
     volumes:
       - huggingface-cache:/root/.cache/huggingface
-      - deepseek-temp:/tmp/deepseek_ocr
+      - unlimited-temp:/tmp/unlimited_ocr
 
     deploy:
       resources:
@@ -34,4 +34,4 @@ services:
 
 volumes:
   huggingface-cache:
-  deepseek-temp:
+  unlimited-temp:

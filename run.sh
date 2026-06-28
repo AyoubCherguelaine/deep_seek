@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-APP_NAME="deepseek-ocr-api"
-IMAGE_NAME="deepseek-ocr-api:latest"
-CONTAINER_NAME="deepseek-ocr-api"
+APP_NAME="unlimited-ocr-api"
+IMAGE_NAME="unlimited-ocr-api:latest"
+CONTAINER_NAME="unlimited-ocr-api"
 
 if [ ! -f ".env" ]; then
   echo "No .env found. Creating from .env.example..."
@@ -31,8 +31,8 @@ docker run -d \
   -e NVIDIA_VISIBLE_DEVICES=all \
   -e NVIDIA_DRIVER_CAPABILITIES=compute,utility \
   -p 8000:8000 \
-  -v deepseek_ocr_hf_cache:/root/.cache/huggingface \
-  -v deepseek_ocr_tmp:/tmp/deepseek_ocr \
+  -v unlimited_ocr_hf_cache:/root/.cache/huggingface \
+  -v unlimited_ocr_tmp:/tmp/unlimited_ocr \
   "$IMAGE_NAME"
 
 echo "Container started."

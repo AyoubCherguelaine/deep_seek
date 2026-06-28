@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -16,19 +16,11 @@ def _load_env_file(path: str = ".env") -> None:
         name, value = line.split("=", 1)
         name = name.strip()
         value = value.strip().strip('"').strip("'")
-
         if name:
             os.environ.setdefault(name, value)
 
 
 _load_env_file()
-
-
-def _get_bool(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def _get_int(name: str, default: int) -> int:
@@ -38,50 +30,56 @@ def _get_int(name: str, default: int) -> int:
     return int(value)
 
 
-def _get_float(name: str, default: float) -> float:
-    value = os.getenv(name)
-    if value is None or value.strip() == "":
-        return default
-    return float(value)
-
-
 @dataclass(frozen=True)
 class Settings:
     # Server
-    app_name: str = os.getenv("APP_NAME", "deepseek-ocr-api")
+    app_name: str = os.getenv("APP_NAME", "unlimited-ocr-api")
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = _get_int("PORT", 8000)
     workers: int = _get_int("WORKERS", 1)
 
-    # Model
-    model_name: str = os.getenv("MODEL_NAME", "deepseek-ai/DeepSeek-OCR-2")
+    # GPU/model
     cuda_visible_devices: str = os.getenv("CUDA_VISIBLE_DEVICES", "0")
-    use_flash_attention: bool = _get_bool("USE_FLASH_ATTENTION", False)
-    allow_flash_attention_install: bool = _get_bool("ALLOW_FLASH_ATTENTION_INSTALL", False)
+    model_name: str = os.getenv("MODEL_NAME", "baidu/Unlimited-OCR")
 
-    # OCR mode. These defaults favor latency; raise them for higher quality.
-    base_size: int = _get_int("BASE_SIZE", 640)
-    image_size: int = _get_int("IMAGE_SIZE", 640)
-    crop_mode: bool = _get_bool("CROP_MODE", True)
-    test_compress: bool = _get_bool("TEST_COMPRESS", False)
-    save_ocr_results: bool = _get_bool("SAVE_OCR_RESULTS", False)
-
-    # Prompts:
-    # "<image>\nFree OCR. "
-    # "<image>\n<|grounding|>Convert the document to markdown. "
+    # OCR modes
+    base_size_base: int = _get_int("BASE_SIZE_BASE", 1024)
+    image_size_base: int = _get_int("IMAGE_SIZE_BASE", 1024)
+    base_size_long: int = _get_int("BASE_SIZE_LONG", 1024)
+    image_size_long: int = _get_int("IMAGE_SIZE_LONG", 640)
+    max_length_base: int = _get_int("MAX_LENGTH_BASE", _get_int("MAX_LENGTH", 8192))
+    max_length_long: int = _get_int("MAX_LENGTH_LONG", 4096)
+    no_repeat_ngram_size: int = _get_int("NO_REPEAT_NGRAM_SIZE", 35)
+    ngram_window: int = _get_int("NGRAM_WINDOW", 128)
     default_prompt: str = os.getenv(
         "DEFAULT_PROMPT",
-        "<image>\n<|grounding|>Convert the document to markdown. "
+        (
+            "document parsing. Convert the document to clean Markdown. Preserve Arabic "
+            "text exactly. Preserve mathematics, physics, chemistry, and technical "
+            "notation as valid LaTeX. Preserve tables as Markdown tables. For figures, "
+            "diagrams, charts, photos, boxed regions, highlighted areas, questions, and "
+            "answers, include a short description and bounding box coordinates when "
+            "visible or provided by the model. If Quranic verses are present anywhere, "
+            "including inside tables or quotes after phrases such as 'قال تعالى', do not "
+            "OCR, read, spell, or transcribe the verse characters. Skip that region "
+            "immediately and output only the surah name or number and the ayah number "
+            "when visible or confidently inferable. If uncertain, write 'Quranic verse "
+            "detected - surah unknown, ayah unknown'. Do not continue generating repeated "
+            "verse fragments. Do not invent missing text."
+        ),
     )
 
-    # Upload limits
-    max_upload_mb: int = _get_int("MAX_UPLOAD_MB", 40)
+    # Upload/runtime
+    max_upload_mb: int = _get_int("MAX_UPLOAD_MB", 80)
+    max_pdf_pages: int = _get_int("MAX_PDF_PAGES", 200)
+    pdf_dpi: int = _get_int("PDF_DPI", 200)
+    request_timeout_seconds: int = _get_int("REQUEST_TIMEOUT_SECONDS", 300)
+    temp_dir: str = os.getenv("TEMP_DIR", "/tmp/unlimited_ocr")
+    image_extensions: set[str] = field(
+        default_factory=lambda: {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
+    )
 
-    # Runtime
-    request_timeout_seconds: int = _get_int("REQUEST_TIMEOUT_SECONDS", 180)
-    temp_dir: str = os.getenv("TEMP_DIR", "/tmp/deepseek_ocr")
-
-    # Auth (1-year bearer tokens)
+    # Auth
     auth_api_key: str = os.getenv("AUTH_API_KEY", "")
     auth_token_ttl_days: int = _get_int("AUTH_TOKEN_TTL_DAYS", 365)
 
