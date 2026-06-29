@@ -61,11 +61,13 @@ class Settings:
             "answers, include a short description and bounding box coordinates when "
             "visible or provided by the model. If Quranic verses are present anywhere, "
             "including inside tables or quotes after phrases such as 'قال تعالى', do not "
-            "OCR, read, spell, or transcribe the verse characters. Skip that region "
-            "immediately and output only the surah name or number and the ayah number "
-            "when visible or confidently inferable. If uncertain, write 'Quranic verse "
-            "detected - surah unknown, ayah unknown'. Do not continue generating repeated "
-            "verse fragments. Do not invent missing text."
+            "OCR, read, spell, transliterate, complete, guess, or transcribe the verse "
+            "characters. Also skip visual Quranic script regions written in الخط الكوفي, "
+            "الخط العثماني, رسم المصحف, decorative Quran calligraphy, or mushaf-style "
+            "text even if you cannot read them. For each skipped Quran-style region, "
+            "output exactly [QURAN_SCRIPT_SKIPPED]. Continue OCR for surrounding normal "
+            "Arabic educational text, mathematics, tables, questions, and answers. Do not "
+            "continue generating repeated verse fragments. Do not invent missing text."
         ),
     )
 

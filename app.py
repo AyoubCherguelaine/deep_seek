@@ -35,6 +35,7 @@ logger = logging.getLogger("unlimited-ocr-api")
 MODEL = None
 TOKENIZER = None
 MODEL_LOCK = asyncio.Lock()
+QURAN_SCRIPT_SKIPPED = "[QURAN_SCRIPT_SKIPPED]"
 QURAN_REDACTION = "[آية قرآنية محذوفة - يرجى مراجعة المصدر المعتمد لتحديد السورة ورقم الآية]"
 
 
@@ -260,6 +261,7 @@ def redact_quranic_verses(text: str) -> str:
         return text
 
     quote_chars = '"“”«»'
+    skip_marker = re.escape(QURAN_SCRIPT_SKIPPED)
     trigger = r"(?:قال\s+تعالى|قوله\s+تعالى|قال\s+الله\s+تعالى)"
 
     patterns = [
@@ -281,6 +283,23 @@ def redact_quranic_verses(text: str) -> str:
     redacted = re.sub(
         rf"{re.escape(QURAN_REDACTION)}(?:\s*[{re.escape(quote_chars)}]?\s*[\(\[]?\d+[\)\]]?[{re.escape(quote_chars)}]?)+",
         QURAN_REDACTION,
+        redacted,
+    )
+
+    # Normalize repeated skip markers and remove small hallucinated fragments around them.
+    redacted = re.sub(
+        rf"{skip_marker}(?:\s*{skip_marker})+",
+        QURAN_SCRIPT_SKIPPED,
+        redacted,
+    )
+    redacted = re.sub(
+        rf"{skip_marker}(?:\s*[{re.escape(quote_chars)}]?\s*[\(\[]?\d+[\)\]]?[{re.escape(quote_chars)}]?)+",
+        QURAN_SCRIPT_SKIPPED,
+        redacted,
+    )
+    redacted = re.sub(
+        rf"({skip_marker})(?:\s*(?:[\u06DD\u06DE]|\(\s*\d+\s*\)|\[\s*\d+\s*\]))+",
+        QURAN_SCRIPT_SKIPPED,
         redacted,
     )
     return redacted

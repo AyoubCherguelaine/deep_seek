@@ -177,5 +177,6 @@ Response shape:
 - PDFs are converted to PNG pages with PyMuPDF before OCR.
 - `/ocr/base` accepts images and PDFs.
 - `/ocr/long` accepts images and PDFs.
-- The default prompt asks the model to skip Quranic verse regions immediately. The API also redacts quoted text after common Quran-introduction phrases such as `قال تعالى` before returning the response.
+- The default prompt asks the model to skip Quranic verse regions immediately. Kufi script, Ottoman mushaf script, `رسم المصحف`, decorative Quran calligraphy, and other mushaf-style Quran regions are intentionally returned as `[QURAN_SCRIPT_SKIPPED]` so surrounding normal Arabic educational text can still be OCR'd.
+- The API also redacts quoted text after common Quran-introduction phrases such as `قال تعالى` before returning the response, and collapses repeated Quran skip markers.
 - `torch`, `torchvision`, and `torchaudio` are installed in the Dockerfile from the CUDA 12.8 PyTorch wheel index, not from `requirements.txt`.
