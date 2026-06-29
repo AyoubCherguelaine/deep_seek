@@ -50,6 +50,12 @@ docker run --rm --gpus all vision-ocr-service:latest \
   python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.cuda.get_device_name(0)); print(torch.cuda.get_device_capability(0))"
 ```
 
+## CLI 
+
+```
+uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
 ## Authentication
 
 If `AUTH_API_KEY` is empty, OCR endpoints are open for local development.
